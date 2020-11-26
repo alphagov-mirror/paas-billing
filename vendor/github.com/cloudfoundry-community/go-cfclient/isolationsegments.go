@@ -38,19 +38,6 @@ type IsolationSegementResponse struct {
 	} `json:"links"`
 }
 
-type Pagination struct {
-	TotalResults int `json:"total_results"`
-	TotalPages   int `json:"total_pages"`
-	First        struct {
-		Href string `json:"href"`
-	} `json:"first"`
-	Last struct {
-		Href string `json:"href"`
-	} `json:"last"`
-	Next     string `json:"next"`
-	Previous string `json:"previous"`
-}
-
 type ListIsolationSegmentsResponse struct {
 	Pagination Pagination                  `json:"pagination"`
 	Resources  []IsolationSegementResponse `json:"resources"`
@@ -113,10 +100,13 @@ func (c *Client) GetIsolationSegmentByGUID(guid string) (*IsolationSegment, erro
 
 func (c *Client) ListIsolationSegmentsByQuery(query url.Values) ([]IsolationSegment, error) {
 	var iss []IsolationSegment
-	requestUrl := "/v3/isolation_segments?" + query.Encode()
+	requestURL := "/v3/isolation_segments"
+	if e := query.Encode(); len(e) > 0 {
+		requestURL += "?" + e
+	}
 	for {
 		var isr ListIsolationSegmentsResponse
-		r := c.NewRequest("GET", requestUrl)
+		r := c.NewRequest("GET", requestURL)
 		resp, err := c.DoRequest(r)
 		if err != nil {
 			return nil, errors.Wrap(err, "Error requesting isolation segments")
@@ -142,9 +132,13 @@ func (c *Client) ListIsolationSegmentsByQuery(query url.Values) ([]IsolationSegm
 			})
 		}
 
-		requestUrl = isr.Pagination.Next
-		if requestUrl == "" {
+		requestURL = isr.Pagination.Next.Href
+		if requestURL == "" {
 			break
+		}
+		requestURL, err = extractPathFromURL(requestURL)
+		if err != nil {
+			return nil, err
 		}
 	}
 	return iss, nil
